@@ -8,8 +8,9 @@ import (
 	"strconv"
 )
 
+type JobCode string
+
 type Record struct {
-	jobCode     string
 	jobTitle    string
 	rate        float64
 	description string
@@ -19,11 +20,17 @@ func main() {
 	file := readFile("2025_SCA_Rates.csv")
 	defer file.Close()
 
-	records := readCSV(file, '|', true)
+	records := map[JobCode]Record{}
 
-	for _, record := range records {
-		log.Println(record.jobCode, record.jobTitle, record.rate, record.description)
-	}
+	records = readRatesCSV(file, records, '|', true)
+
+	file = readFile("2023_sca_rates_export_arrs.csv")
+	defer file.Close()
+	records = readDescriptionsCSV(file, records, ',', true)
+
+	// for jobCode, record := range records {
+	// 	log.Println(jobCode, record.jobTitle, record.rate, record.description)
+	// }
 }
 
 func readFile(fileName string) *os.File {
@@ -36,11 +43,14 @@ func readFile(fileName string) *os.File {
 	return file
 }
 
-func readCSV(file *os.File, delimiter rune, skipHeaders bool) []Record {
+func readRatesCSV(
+	file *os.File,
+	records map[JobCode]Record,
+	delimiter rune,
+	skipHeaders bool,
+) map[JobCode]Record {
 	reader := csv.NewReader(file)
 	reader.Comma = delimiter
-
-	var records []Record
 
 	// Skip the header row
 	if skipHeaders {
@@ -67,14 +77,56 @@ func readCSV(file *os.File, delimiter rune, skipHeaders bool) []Record {
 			log.Fatal(err)
 		}
 
-		recordCode := record[0]
+		jobCode := JobCode(record[0])
 		jobTitle := record[1]
 
-		records = append(records, Record{
-			jobCode:  recordCode,
+		records[jobCode] = Record{
 			jobTitle: jobTitle,
 			rate:     rate,
-		})
+		}
+
+	}
+
+	return records
+}
+
+func readDescriptionsCSV(
+	file *os.File,
+	records map[JobCode]Record,
+	delimiter rune,
+	skipHeaders bool,
+) map[JobCode]Record {
+	reader := csv.NewReader(file)
+	reader.Comma = delimiter
+
+	// Skip the header row
+	if skipHeaders {
+		_, err := reader.Read()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	for {
+		record, err := reader.Read()
+
+		if err == io.EOF {
+			break
+		}
+
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		jobCode := JobCode(record[0])
+
+		// check if job code exists
+		if foundRecord, ok := records[jobCode]; ok {
+			foundRecord.description = record[2]
+			records[jobCode] = foundRecord
+		} else {
+			log.Println("job code not found:", jobCode)
+		}
 	}
 
 	return records
