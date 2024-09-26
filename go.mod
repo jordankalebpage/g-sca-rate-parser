@@ -1,3 +1,3 @@
-module sca-rate-sql-thing
+module go-sca-rate-parser
 
 go 1.22.0
